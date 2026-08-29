@@ -147,7 +147,7 @@ app.post('/convert', upload.single('file'), async (req, res) => {
   }
 });
 
-app.listen(PORT, '127.0.0.1', () => {
+const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`[calibre-helper] listening on http://127.0.0.1:${PORT}`);
   console.log(`[calibre-helper] allowed origins: ${ALLOWED_ORIGINS.join(', ')} (+ localhost)`);
   detectCalibre().then((info) => {
@@ -157,4 +157,21 @@ app.listen(PORT, '127.0.0.1', () => {
       console.warn('[calibre-helper] Calibreが見つかりませんでした。ebook-convertをPATHに追加するか、既定のインストール先を確認してください。');
     }
   });
+});
+
+// ポート使用中(二重起動、または最小化した前回のウィンドウが残っている等)を、
+// Node標準の生のスタックトレースではなく分かりやすいメッセージにする
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error('');
+    console.error(`[calibre-helper] ポート${PORT}は既に使用中です。`);
+    console.error('[calibre-helper] おそらく既にこのヘルパーが起動しています(二重起動は不要です)。');
+    console.error(`[calibre-helper] 確認方法: ブラウザで http://127.0.0.1:${PORT}/health を開いてください。`);
+    console.error('[calibre-helper] 他のウィンドウが見当たらない場合は、タスクマネージャーでnode.exeを終了してから、もう一度お試しください。');
+    console.error('');
+    process.exit(0);
+  } else {
+    console.error('[calibre-helper] 起動エラー:', err);
+    process.exit(1);
+  }
 });
