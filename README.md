@@ -25,6 +25,11 @@ can be imported.
 
 Both are plain installers; no extra configuration is needed (PATH setup is handled by the installers).
 
+> **Important (Windows):** put this folder somewhere with an **ASCII-only path** (e.g. `C:\calibre-helper`).
+> We found that Node.js 22 on Windows crashes (segfaults) while loading `express` when the folder path
+> contains non-ASCII characters (e.g. a Japanese folder name like `その他`). This is a Node.js issue, not
+> something this tool can work around. Avoid placing it under a non-English folder name.
+
 ## Usage
 
 1. Download and extract this folder
@@ -49,6 +54,7 @@ normally (this is only needed once, because this distribution isn't notarized by
 | eEPUB still shows KFX as "not supported" | Make sure the helper is actually running. While it's up, open `http://127.0.0.1:47821/health` in a browser to check its status |
 | Conversion "failed" | Your Calibre install may not support that file's format or DRM. **This helper never removes DRM itself** — the result depends entirely on your own Calibre setup |
 | "Port 47821 already in use" | Something else is using that port. Change the `PORT` constant at the top of `calibre-helper/server.mjs`, or set the `PORT` environment variable before starting |
+| Window closes instantly with no error at all | The folder path likely contains non-ASCII characters (e.g. Japanese). Move the folder to an ASCII-only path such as `C:\calibre-helper` and try again |
 
 ## A note on DRM
 
