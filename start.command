@@ -1,45 +1,44 @@
 #!/bin/bash
-# eEPUB Calibre連携ヘルパー起動スクリプト(Mac)
-# このファイルをダブルクリックすると、必要な準備をしてからヘルパーを起動します。
-# ターミナルのウィンドウを閉じるとヘルパーは停止します
-# (eEPUBからKFX/Kindle変換が使えなくなります)。
+# eEPUB Calibre Helper launcher (Mac)
+# Double-click this file to set up (first run only) and start the helper.
+# Closing the terminal window stops the helper
+# (KFX/Kindle conversion in eEPUB stops working).
 
 cd "$(dirname "$0")" || exit 1
 
 if ! command -v node >/dev/null 2>&1; then
   echo ""
-  echo "[エラー] Node.js が見つかりませんでした。"
-  echo "このツールを使うには、先にNode.jsをインストールしてください。"
-  echo "  https://nodejs.org/ja/"
-  echo "インストール後、もう一度このファイルをダブルクリックしてください。"
+  echo "[ERROR] Node.js was not found."
+  echo "Please install Node.js first, then double-click this file again."
+  echo "  https://nodejs.org/"
   echo ""
-  read -r -p "Enterキーでこのウィンドウを閉じます..."
+  read -r -p "Press Enter to close this window..."
   exit 1
 fi
 
 if [ ! -d "node_modules" ]; then
   echo ""
-  echo "初回起動の準備をしています(依存関係のインストール、少し時間がかかります)..."
+  echo "First run: installing dependencies, this may take a moment..."
   echo ""
   if ! npm install; then
     echo ""
-    echo "[エラー] npm install に失敗しました。上のログを確認してください。"
+    echo "[ERROR] npm install failed. See the log above."
     echo ""
-    read -r -p "Enterキーでこのウィンドウを閉じます..."
+    read -r -p "Press Enter to close this window..."
     exit 1
   fi
 fi
 
 echo ""
 echo "============================================================"
-echo " eEPUB Calibre連携ヘルパーを起動します"
-echo " このウィンドウは開いたままにしてください。"
-echo " 閉じるとeEPUB側からのKFX/Kindle変換が使えなくなります。"
+echo " Starting eEPUB Calibre Helper"
+echo " Keep this window open while you use it in eEPUB."
+echo " Closing this window stops the helper."
 echo "============================================================"
 echo ""
 
 npm start
 
 echo ""
-echo "ヘルパーが終了しました。"
-read -r -p "Enterキーでこのウィンドウを閉じます..."
+echo "Helper stopped."
+read -r -p "Press Enter to close this window..."

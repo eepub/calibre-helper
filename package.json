@@ -2,7 +2,7 @@
   "name": "eepub-calibre-helper",
   "version": "0.0.1",
   "private": true,
-  "description": "eEPUB用ローカルCalibre連携ヘルパー(試作) - Mac/Windowsにインストール済みのCalibreをlocalhost経由で呼び出す",
+  "description": "Optional local helper for eEPUB that calls your locally installed Calibre (Mac/Windows) via localhost",
   "type": "module",
   "main": "server.mjs",
   "scripts": {

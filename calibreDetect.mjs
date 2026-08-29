@@ -8,7 +8,7 @@ const execFileAsync = promisify(execFile);
 const isWindows = process.platform === 'win32';
 const isMac = process.platform === 'darwin';
 
-// OSごとの定番インストール先(PATHが通っていない場合のフォールバック候補)
+// Common per-OS install locations (fallback candidates when PATH doesn't have it)
 function candidatePaths() {
   const candidates = [];
   if (isWindows) {
@@ -30,7 +30,7 @@ function candidatePaths() {
       '/usr/local/bin/ebook-convert', // Homebrew cask (Intel)
     );
   } else {
-    // Linux(参考程度。今回の対象外だが動くなら動かす)
+    // Linux (not an official target, but let it work if it happens to)
     candidates.push('/usr/bin/ebook-convert', '/opt/calibre/ebook-convert');
   }
   return candidates;
@@ -56,7 +56,7 @@ async function findOnPath() {
 async function getVersion(ebookConvertPath) {
   try {
     const { stdout } = await execFileAsync(ebookConvertPath, ['--version']);
-    // 例: "ebook-convert (calibre 7.14)"
+    // e.g. "ebook-convert (calibre 7.14)"
     const match = stdout.match(/calibre\s+([\d.]+)/i);
     return match ? match[1] : stdout.trim().split('\n')[0];
   } catch {
@@ -65,7 +65,7 @@ async function getVersion(ebookConvertPath) {
 }
 
 /**
- * Calibreのインストールを検出する。
+ * Detect a Calibre installation.
  * @returns {Promise<{found: boolean, ebookConvertPath: string|null, calibredbPath: string|null, version: string|null, source: string|null}>}
  */
 export async function detectCalibre() {

@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>calibre-helper 試作テストページ</title>
+<title>calibre-helper test page</title>
 <style>
   body { font-family: sans-serif; max-width: 640px; margin: 2rem auto; line-height: 1.6; }
   button { padding: 0.5rem 1rem; margin: 0.25rem 0; }
@@ -12,32 +12,32 @@
 </style>
 </head>
 <body>
-<h1>calibre-helper 試作テストページ</h1>
-<p>このページは <code>http://localhost</code> から <code>http://127.0.0.1:47821</code> のヘルパーへ実際にfetchし、
-CORS/Private Network Access越しに動くかを確認するためのものです。</p>
+<h1>calibre-helper test page</h1>
+<p>This page fetches the helper at <code>http://127.0.0.1:47821</code> from <code>http://localhost</code>,
+to check whether it works across CORS / Private Network Access.</p>
 
-<h2>1. ヘルスチェック</h2>
+<h2>1. Health check</h2>
 <button id="healthBtn">GET /health</button>
-<pre id="healthOut">(未実行)</pre>
+<pre id="healthOut">(not run yet)</pre>
 
-<h2>2. ファイル変換</h2>
+<h2>2. Convert a file</h2>
 <input type="file" id="fileInput" />
-<button id="convertBtn">/convert に送信 → EPUB化</button>
-<pre id="convertOut">(未実行)</pre>
+<button id="convertBtn">Send to /convert &rarr; make EPUB</button>
+<pre id="convertOut">(not run yet)</pre>
 
 <script>
 const HELPER_URL = 'http://127.0.0.1:47821';
 
 document.getElementById('healthBtn').onclick = async () => {
   const out = document.getElementById('healthOut');
-  out.textContent = '問い合わせ中...(初回はブラウザのローカルネットワークアクセス許可ダイアログが出ることがあります)';
+  out.textContent = 'Checking... (the browser may show a local network access permission prompt the first time)';
   try {
     const res = await fetch(HELPER_URL + '/health');
     const json = await res.json();
     out.textContent = JSON.stringify(json, null, 2);
     out.className = json.found ? 'ok' : 'ng';
   } catch (e) {
-    out.textContent = 'エラー: ' + e;
+    out.textContent = 'Error: ' + e;
     out.className = 'ng';
   }
 };
@@ -45,8 +45,8 @@ document.getElementById('healthBtn').onclick = async () => {
 document.getElementById('convertBtn').onclick = async () => {
   const out = document.getElementById('convertOut');
   const file = document.getElementById('fileInput').files[0];
-  if (!file) { out.textContent = 'ファイルを選択してください'; return; }
-  out.textContent = '変換中...';
+  if (!file) { out.textContent = 'Please choose a file first'; return; }
+  out.textContent = 'Converting...';
   try {
     const fd = new FormData();
     fd.append('file', file, file.name);
@@ -54,7 +54,7 @@ document.getElementById('convertBtn').onclick = async () => {
     const res = await fetch(HELPER_URL + '/convert', { method: 'POST', body: fd });
     if (!res.ok) {
       const errJson = await res.json().catch(() => ({}));
-      out.textContent = 'エラー(' + res.status + '): ' + JSON.stringify(errJson, null, 2);
+      out.textContent = 'Error (' + res.status + '): ' + JSON.stringify(errJson, null, 2);
       out.className = 'ng';
       return;
     }
@@ -65,10 +65,10 @@ document.getElementById('convertBtn').onclick = async () => {
     const a = document.createElement('a');
     a.href = url;
     a.download = (file.name.replace(/\.[^.]+$/, '') || 'converted') + '.epub';
-    a.textContent = '変換成功: ' + a.download + ' をダウンロード (' + blob.size + ' bytes)';
+    a.textContent = 'Success: download ' + a.download + ' (' + blob.size + ' bytes)';
     out.appendChild(a);
   } catch (e) {
-    out.textContent = 'エラー: ' + e;
+    out.textContent = 'Error: ' + e;
     out.className = 'ng';
   }
 };
