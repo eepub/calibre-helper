@@ -9,7 +9,7 @@
 import express from 'express';
 import multer from 'multer';
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, readdir } from 'node:fs/promises';
+import { mkdtemp, rm, readdir, stat as fsStat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { detectCalibre } from './calibreDetect.mjs';
@@ -149,6 +149,152 @@ app.post('/convert', upload.single('file'), async (req, res) => {
       error: 'Conversion failed.',
       detail: String(err?.stderr || err?.message || err).slice(0, 2000),
     });
+  }
+});
+
+// --- Calibre library browsing ---
+// Lets eEPUB list books already sitting in the user's Calibre library and
+// pull in the ones that already have an EPUB, instead of requiring a
+// one-by-one file upload. Read-only: we never write to the library.
+
+const LIST_TIMEOUT_MS = 20 * 1000;
+
+function runCalibredbOnce(calibredbPath, args) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      calibredbPath,
+      args,
+      { timeout: LIST_TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 },
+      (err, stdout, stderr) => {
+        if (err) {
+          reject(Object.assign(err, { stdout, stderr }));
+        } else {
+          resolve(stdout);
+        }
+      }
+    );
+  });
+}
+
+// calibredb doesn't tolerate being invoked more than once at the same time
+// (confirmed: 4 concurrent `calibredb list` calls for cover images, only 1
+// succeeded, the rest failed) - on top of already refusing to run at all
+// while the Calibre GUI has the library open. A browser page can easily
+// fire several requests at once (e.g. one <img> per book cover), so every
+// calibredb invocation is queued through here to run one at a time.
+let calibredbQueue = Promise.resolve();
+function runCalibredb(calibredbPath, args) {
+  const result = calibredbQueue.then(
+    () => runCalibredbOnce(calibredbPath, args),
+    () => runCalibredbOnce(calibredbPath, args)
+  );
+  calibredbQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+// calibredb refuses to read the library while the Calibre GUI (or its
+// content server) has it open, to avoid clobbering in-memory state. It's
+// a real, common situation - detect it so the frontend can show a clear
+// message instead of a generic failure.
+function isLibraryBusyError(err) {
+  const text = `${err?.stderr || ''} ${err?.message || ''}`;
+  return /calibre-server|calibre.{0,20}(running|is currently)|already running/i.test(text);
+}
+
+async function findBookById(calibredbPath, id) {
+  const stdout = await runCalibredb(calibredbPath, [
+    'list',
+    '--for-machine',
+    '--fields=title,authors,formats,cover',
+    '-s', `id:${id}`,
+  ]);
+  const rows = JSON.parse(stdout);
+  return rows[0] || null;
+}
+
+app.get('/library', async (_req, res) => {
+  const info = await detectCalibre();
+  if (!info.found || !info.calibredbPath) {
+    res.status(503).json({ ok: false, error: 'calibredb was not found. Please make sure Calibre is installed.' });
+    return;
+  }
+  try {
+    const stdout = await runCalibredb(info.calibredbPath, [
+      'list',
+      '--for-machine',
+      '--fields=title,authors,formats,id',
+    ]);
+    const rows = JSON.parse(stdout);
+    const books = rows
+      .filter((row) => Array.isArray(row.formats) && row.formats.some((f) => f.toLowerCase().endsWith('.epub')))
+      .map((row) => ({ id: row.id, title: row.title, authors: row.authors || '' }));
+    res.json({ ok: true, books });
+  } catch (err) {
+    console.error('[calibre-helper] library list error:', err);
+    if (isLibraryBusyError(err)) {
+      res.status(409).json({
+        ok: false,
+        error: 'library_busy',
+        message: 'The Calibre app is currently open. Please close it and try again.',
+      });
+      return;
+    }
+    res.status(500).json({ ok: false, error: 'Could not read the Calibre library.', detail: String(err?.stderr || err?.message || err).slice(0, 2000) });
+  }
+});
+
+app.get('/library/:id/epub', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ ok: false, error: 'Invalid book id.' });
+    return;
+  }
+  const info = await detectCalibre();
+  if (!info.found || !info.calibredbPath) {
+    res.status(503).json({ ok: false, error: 'calibredb was not found.' });
+    return;
+  }
+  try {
+    const book = await findBookById(info.calibredbPath, id);
+    const epubPath = book?.formats?.find((f) => f.toLowerCase().endsWith('.epub'));
+    if (!epubPath) {
+      res.status(404).json({ ok: false, error: 'No EPUB format found for this book.' });
+      return;
+    }
+    await fsStat(epubPath); // throws if missing/unreadable
+    const filename = `${(book.title || 'book').replace(/[\\/:*?"<>|]/g, '_')}.epub`;
+    res.download(epubPath, filename);
+  } catch (err) {
+    console.error('[calibre-helper] library epub fetch error:', err);
+    if (isLibraryBusyError(err)) {
+      res.status(409).json({ ok: false, error: 'library_busy', message: 'The Calibre app is currently open. Please close it and try again.' });
+      return;
+    }
+    res.status(500).json({ ok: false, error: 'Could not read this book.', detail: String(err?.stderr || err?.message || err).slice(0, 2000) });
+  }
+});
+
+app.get('/library/:id/cover', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ ok: false, error: 'Invalid book id.' });
+    return;
+  }
+  const info = await detectCalibre();
+  if (!info.found || !info.calibredbPath) {
+    res.status(503).end();
+    return;
+  }
+  try {
+    const book = await findBookById(info.calibredbPath, id);
+    if (!book?.cover) {
+      res.status(404).end();
+      return;
+    }
+    await fsStat(book.cover);
+    res.sendFile(book.cover);
+  } catch {
+    res.status(404).end();
   }
 });
 
